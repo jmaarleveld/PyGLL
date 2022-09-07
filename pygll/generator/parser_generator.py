@@ -6,7 +6,7 @@
 import functools
 import typing
 
-from ...util import cache
+from ..util import cache
 from ..grammar import context_free_grammar as _cfg
 
 from .code_gen import AbstractCodeGenerator
@@ -19,10 +19,10 @@ from .code_gen import AbstractCodeGenerator
 
 def generate_parser(grammar: _cfg.ContextFreeGrammar,
                     generator: AbstractCodeGenerator):
-    generator.define_import('orion.gll.core.base', 'AbstractParser')
-    generator.define_import('orion.gll.core.base', 'GrammarSlot')
-    generator.define_import('orion.gll.core.base', 'Descriptor')
-    generator.define_import('orion.gll.core.base', 'InitialNode')
+    generator.define_import('pygll.core.base', 'AbstractParser')
+    generator.define_import('pygll.core.base', 'GrammarSlot')
+    generator.define_import('pygll.core.base', 'Descriptor')
+    generator.define_import('pygll.core.base', 'InitialNode')
     with generator.define_class('Parser', ['AbstractParser']):
         _generate_grammar_slots(grammar, generator)
         _generate_initial_descriptor(grammar, generator)
