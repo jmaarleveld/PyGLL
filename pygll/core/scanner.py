@@ -30,8 +30,8 @@ class Scanner:
         return self.__source[self.__pos:self.__pos + length]
 
     def peek_forward(self, length: int) -> str:
-        #return self.__source[self.__pos + 1:self.__pos + length + 1]
-        return self.peek(length)
+        return self.__source[self.__pos + 1:self.__pos + length + 1]
+        #return self.peek(length)
 
     def peek_backward(self, length: int) -> str:
         return self.__source[self.__pos - length:self.__pos]

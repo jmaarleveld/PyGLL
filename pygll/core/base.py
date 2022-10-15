@@ -142,8 +142,6 @@ class AbstractParser(abc.ABC):
                     # Check is called with the span of the parsed nonterminal
                     if not check(to.position, self.scanner.position):
                         break
-                    if self.debug:
-                        self.log('check success')
                 else:   # Only execute if all checks succeeded
                     # Add descriptor
                     node = self.get_node_p(self.c_u.slot, label, self.c_n)

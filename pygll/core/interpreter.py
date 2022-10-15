@@ -149,8 +149,8 @@ class _InterpretedParser(_base.AbstractParser):
                     f'Unknown disambiguation check: {check.__class__.__name__}'
                 )
 
-    def __emulate_range_or_literal_check(self,
-                                         ranges,
+    @staticmethod
+    def __emulate_range_or_literal_check(ranges,
                                          literals,
                                          negated,
                                          peek_function) -> bool:
