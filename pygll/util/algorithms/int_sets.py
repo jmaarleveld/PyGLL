@@ -24,6 +24,10 @@ class IntSet:
         # Normalize the input ranges
         self.__content = sorted(self.__union(list(content)))
 
+    @classmethod
+    def empty_set(cls, universe: tuple[int, int]) -> typing.Self:
+        return cls((), universe)
+
     @property
     def ranges(self) -> tuple[tuple[int, int]]:
         return tuple(self.__content)
@@ -173,6 +177,7 @@ if __name__ == '__main__':
     p = IntSet(((0, 1), (4, 4), (8, 14)), (0, 20))
     q = IntSet(((2, 6), (12, 17), (20, 20)), (0, 20))
     u = IntSet(((0, 20),), (0, 20))
+    e = IntSet((), (0, 20))
     assert p == p
     assert p != q
     assert p & u == p, p & u
@@ -187,3 +192,15 @@ if __name__ == '__main__':
     assert p & q == IntSet(((4, 4), (12, 14)), (0, 20)), p & q
     assert (~~p) == p
     assert (~~u) == u
+    assert e | p == p
+    assert e | q == q
+    assert e | u == u
+    assert e | e == e
+    assert e & p == e
+    assert e & q == e
+    assert e & u == e
+    assert e & e == e
+    assert (~e) == IntSet(((0, 20),), (0, 20))
+    assert (~~e) == e
+    assert e.empty
+    assert e == IntSet.empty_set((0, 20))

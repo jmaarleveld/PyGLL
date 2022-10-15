@@ -54,7 +54,6 @@ Expansion = tuple[Alternative, ...]
 
 GLLBlock = list[Terminal | Nonterminal]
 
-
 ##############################################################################
 ##############################################################################
 # Context Free Grammar
@@ -74,6 +73,10 @@ class ContextFreeGrammar:
         self.__start = start
         self.__first = None
         self.__follow = None
+
+    @property
+    def nonterminals(self) -> frozenset[Nonterminal]:
+        return frozenset(self.__rules)
 
     ###################################################################
     # Grammar Printing

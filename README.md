@@ -22,6 +22,7 @@ as a basis for the implementation:
 
 - _B.C.M. Cappers - Exploring and visualizing GLL parsing. https://pure.tue.nl/ws/files/46987757/782897-1.pdf_ 
 - _Elizabeth Scott, Adrian Johnstone - Structuring the GLL parsing algorithm for performance. https://www.sciencedirect.com/science/article/pii/S016764231630003X_
+- _Afroozeh, A., Izmaylova, A. (2015). Faster, Practical GLL Parsing. https://link.springer.com/chapter/10.1007/978-3-662-46663-6_5_ 
 
 The second goal of this project is to implement an
 easy-to-use parser generator which allows the use 
@@ -34,48 +35,31 @@ metaprogramming language.
 
 ## TODOS
 
-- Implement conversion of rascal-style grammar definitions to context free grammars 
-  - Disambiguation, kleene star, named nodes etc. are additional abstractions which 
-    are not part of normal context free grammars. They have to be somehow implemented.
-    Some will be implemented when generating the context free grammar (e.g. kleene star),
-    while others will be implemented by running after parsing (e.g. disambiguation)
-- Implement automatic CST node generation
-  - With support for pattern matching
-- Implement conversion of parse trees to CST nodes defined in the rascal-style grammar 
+- [ ] Implement conversion of rascal-style grammar definitions to context free grammars
+  - [x] Implement precede/not precede checks 
+  - [ ] Implement follow/not follow checks 
+    - [x] Implement follow/not follow for terminals 
+    - [ ] Implement follow/not follow for nonterminals 
+      - I am currently not sure where and how to insert checks. 
+        Literature says to put them in the `pop` function,
+        but I have not gotten this to work correctly.
+  - [ ] Implement restriction checks
+  - [ ] Implement "inline choice"
+  - [ ] Implement kleene star and related constructs
+  - [ ] Implement parametrized nonterminals 
+  - [ ] Complete this list
+- [ ] Refactor `IntermediateNode` and `IntermediateNodeKey` to no longer have the `is_nonterminal` field.
+  This field should be moved to the `GrammarSlot` class.
+- [ ] Clean up debugging code 
+- [ ] Implement automatic CST node generation with support for pattern matching
+- [ ] Implement conversion of parse trees to CST nodes defined in the rascal-style grammar 
   - The parser uses generic `{Packed,Terminal,Intermediate}Node`s. 
     These have to be converted to the generated CST nodes to enable pattern matching.
-- Implement concrete syntax matching 
-- Rework code generator to be more language agnostic. 
-  - Idea: rework `AbstractCodeGenerator` to have specific functions for generating
-            parsers, parsing methods, and GOTOs, all based on some "schema" which
-            can be passed to the methods. 
-            The goal is to move away from code/line level code generation, and move
-            to a move abstract implementation -- this should make generating 
-            C or Cython code easier.
-- Implement C and Cython accelerator modules
-- Think about automatic AST node generation
+- [ ] Implement concrete syntax matching 
+- [x] Rework code generator to be more language agnostic.
+- [ ] Implement C and Cython accelerator modules
+- [ ] Think about automatic AST node generation
   - We can generate default nodes by only storing named symbols in rules, 
     and dropping all other information.
-- Improve documentation
-- Write tests
-
----
-
-## Rascal Syntax and Constructs
-
-1) Rascal - SyntaxDefinition
-https://tutor.rascal-mpl.org/Rascal/Declarations/SyntaxDefinition/SyntaxDefinition.html
-2) Rascal - Symbol
-https://tutor.rascal-mpl.org/Rascal/Declarations/SyntaxDefinition/Symbol/Symbol.html
-3) Rascal - Prefer/Avoid
-https://github.com/usethesource/rascal/blob/main/src/org/rascalmpl/library/lang/sdf2/filters/PreferAvoid.rsc
-4) Rascal - Follow
-https://tutor.rascal-mpl.org/Rascal/Declarations/SyntaxDefinition/Disambiguation/Follow/Follow.html
-5) Rascal - Precede
-https://tutor.rascal-mpl.org/Rascal/Declarations/SyntaxDefinition/Disambiguation/Precede/Precede.html
-6) Rascal - Reserve
-https://tutor.rascal-mpl.org/Rascal/Declarations/SyntaxDefinition/Disambiguation/Disambiguation.html#/Rascal/Declarations/SyntaxDefinition/Disambiguation/Reserve/Reserve.html
-7) Rascal - Priority
-https://tutor.rascal-mpl.org/Rascal/Declarations/SyntaxDefinition/Disambiguation/Priority/Priority.html
-8) Rascal - Associativity
-https://tutor.rascal-mpl.org/Rascal/Declarations/SyntaxDefinition/Disambiguation/Disambiguation.html#/Rascal/Declarations/SyntaxDefinition/Disambiguation/Associativity/Associativity.html
+- [ ] Improve documentation
+- [ ] Write tests

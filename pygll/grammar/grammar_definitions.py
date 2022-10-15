@@ -11,7 +11,7 @@ import enum
 import functools
 import operator
 
-from ..util.algorithms import int_sets as _int_sets
+from ...util.algorithms import int_sets as _int_sets
 
 ##############################################################################
 ##############################################################################
@@ -99,6 +99,18 @@ class LabeledRule(_Rule):
     name: str
 
 
+# Rascal supports unlabeled rules, but to support
+# them you need something like Rascal's concrete
+# syntax fragments.
+# Supporting this in Python would at the very least
+# not be very clean, and it would not work nicely
+# with static typing.
+#
+# Unlabeled rules still have their place, though.
+# They are still the cleanest way of defining
+# lexical, layout, and keyword nonterminals.
+# However, they will be banned for syntax
+# nonterminals.
 @dataclasses.dataclass(eq=False, frozen=True, slots=True)
 class UnlabeledRule(_Rule):
     pass

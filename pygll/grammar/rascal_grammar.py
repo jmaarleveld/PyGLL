@@ -636,7 +636,7 @@ prod_modifier = Syntax(
 )
 
 prod = Syntax(
-    name='Prof',
+    name='Prod',
     production=Choice(
         (
             (
