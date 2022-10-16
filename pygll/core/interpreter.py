@@ -141,7 +141,7 @@ class _InterpretedParser(_base.AbstractParser):
                 return self.__emulate_range_or_literal_check(ranges,
                                                              literals,
                                                              negated,
-                                                             self.scanner.peek_forward)
+                                                             self.scanner.peek)
             case _ast.RestrictionCheck(slot, literals, ranges):
                 raise NotImplementedError
             case _:

@@ -129,13 +129,14 @@ class PythonCodeGenerator(AbstractCodeGenerator):
                                            checks: list[_ast.AmbiguityCheckDefinition]):
         self.writer.write_line('def get_ambiguity_checks_for_slot(self, slot: GrammarSlot):')
         with self.writer.increased_indent():
-            checks_by_slot = {
-                f'self.{check.slot}': f'self.{check.name}'
-                for check in checks
-            }
+            checks_by_slot = {}
+            for check in checks:
+                checks_by_slot.setdefault(f'self.{check.slot}', []).append(
+                    f'self.{check.name}'
+            )
             self.writer.write_line(
                 'checks_by_slot = {' +
-                ', '.join(f'{key}: {value}' for key, value in checks_by_slot.items()) +
+                ', '.join(f'{key}: [{", ".join(value)}]' for key, value in checks_by_slot.items()) +
                 '}'
             )
             self.writer.write_line('return checks_by_slot.get(slot, [])')
@@ -186,7 +187,7 @@ class PythonCodeGenerator(AbstractCodeGenerator):
             self._generate_precede_or_follow_check_body(literals,
                                                         ranges,
                                                         negated,
-                                                        'peek_forward')
+                                                        'peek')
 
     def _generate_precede_or_follow_check_body(self, literals, ranges, negated, peek_function):
         if ranges:

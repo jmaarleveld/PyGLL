@@ -137,9 +137,10 @@ class AbstractParser(abc.ABC):
                     if self.debug:
                         self.log(
                             f'Running ambiguity check on: <{to.slot}, {to.position}> '
-                            f'(span: {to.position}-{self.scanner.position - 1})'
+                            f'(span: {to.position}-{self.scanner.position})'
                         )
                     # Check is called with the span of the parsed nonterminal
+                    self.log(f'Amb.check::peek = {self.scanner.peek_forward(1)}')
                     if not check(to.position, self.scanner.position):
                         break
                 else:   # Only execute if all checks succeeded
