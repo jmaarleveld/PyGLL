@@ -30,13 +30,24 @@ class AbstractParser(abc.ABC):
     NULL_SLOT = GrammarSlot('$null', 0, 0, False, False)
 
     def __init__(self,
-                 text: str,
-                 *, logger: logging.Logger | None = None,
+                 *,
+                 logger: logging.Logger | None = None,
                  debug: bool = False):
         # Set up debugging functionality
         self.logger = logger
         self.debug = debug
 
+        self.scanner = None
+        self.todo = None
+        self.seen_descriptors = None
+        self.popped = None
+        self.created = None
+        self.terminal_nodes = None
+        self.gss = None
+        self.root = self.c_u = self.c_n = self.c_r = None
+        self.current_state = None
+
+    def parse(self, text):
         # Actual parsing
         self.scanner = scanner.Scanner(text)
 
@@ -73,8 +84,6 @@ class AbstractParser(abc.ABC):
         # Main parsing loop
         while self.todo:
             descriptor: Descriptor = self.todo.popleft()
-            if self.debug:
-                self.on_state_switch(descriptor)
             self.current_state = descriptor
             self.c_n = descriptor.node
             self.c_u = descriptor.stack
@@ -87,16 +96,11 @@ class AbstractParser(abc.ABC):
         # number and position when nonterminal == True.
         slot = self.get_final_slot()
         key = IntermediateNodeKey(slot, True, 0, len(text))
-        self._result = self.created.get(key, None)
+        result = self.created.get(key, None)
+        return result
 
     _initial_grammar_slot_idx0 = None
     _initial_grammar_slot_idx1 = None
-
-    @property
-    def result(self):
-        if self._result is None:
-            raise ParsingError('Failed to parse')
-        return self._result
 
     def add(self,
             g: GrammarSlot,
@@ -104,17 +108,19 @@ class AbstractParser(abc.ABC):
             position: int,
             s: Node):
         descriptor = Descriptor(g, stack, position, s)
-        if self.debug:
-            self.on_add(descriptor)
+        self.log(f'add() called with descriptor: {descriptor}')
         if descriptor not in self.seen_descriptors:
+            self.log(
+                f'Adding new descriptor: {descriptor}'
+            )
             self.seen_descriptors.add(descriptor)
             self.todo.append(descriptor)
 
     def create(self, slot: GrammarSlot):
-        if self.debug:
-            self.on_create(slot)
+        self.log(f'create() called with slot: {slot}')
         ref = GSSNodeReference(slot, self.scanner.position)
         if ref not in self.gss:
+            self.log(f'Creating GSS node for {ref}')
             self.gss.add_node(ref)
         if self.c_u not in self.gss.get_children(ref):
             self.gss.add_edge(from_=ref, to=self.c_u, label=self.c_n)
@@ -125,8 +131,7 @@ class AbstractParser(abc.ABC):
 
     def pop(self):
         # Pop the node (self.c_u, self.scanner.position)
-        if self.debug:
-            self.on_pop()
+        self.log(f'pop() was called for {self.c_u}')
         if self.c_u is not self.root:
             self.popped[self.c_u].append(self.c_n)
             to: GSSNodeReference
@@ -134,13 +139,7 @@ class AbstractParser(abc.ABC):
             for to, label in self.gss.get_edges(self.c_u):
                 # Check for ambiguity
                 for check in self.get_ambiguity_checks_for_slot(self.c_u.slot):
-                    if self.debug:
-                        self.log(
-                            f'Running ambiguity check on: <{to.slot}, {to.position}> '
-                            f'(span: {to.position}-{self.scanner.position})'
-                        )
                     # Check is called with the span of the parsed nonterminal
-                    self.log(f'Amb.check::peek = {self.scanner.peek_forward(1)}')
                     if not check(to.position, self.scanner.position):
                         break
                 else:   # Only execute if all checks succeeded
@@ -149,6 +148,7 @@ class AbstractParser(abc.ABC):
                     self.add(self.c_u.slot, to, self.scanner.position, node)
 
     def get_node_t(self, char: str) -> TerminalNode:
+        self.log(f'Creating Terminal node for: {char!r}')
         node = TerminalNode(
             left_extent=self.scanner.position,
             right_extent=self.scanner.position + len(char),
@@ -156,17 +156,14 @@ class AbstractParser(abc.ABC):
         )
         # Try to use a cached version of the node
         node = self.terminal_nodes.setdefault(node.key, node)
-        if self.debug:
-            self.on_node_t(char, node)
         return node
 
     def get_node_p(self,
                    slot: GrammarSlot,
                    left: Node,
                    right: Node) -> Node:
+        self.log(f'get_node_p() called for {slot}')
         if slot.alpha_is_special and not slot.beta_is_special:
-            if self.debug:
-                self.on_node_p(slot, left, right, right)
             return right
         left_extent = (left.left_extent
                        if not isinstance(left, InitialNode)
@@ -174,11 +171,8 @@ class AbstractParser(abc.ABC):
         intermediate_node = IntermediateNode(
             left_extent=left_extent,
             right_extent=right.right_extent,
-            is_nonterminal_node=slot.beta_is_special,
             slot=slot
         )
-        if self.debug:
-            self.on_inode(intermediate_node.key)
         node = self.created.setdefault(intermediate_node.key,
                                        intermediate_node)
         split = (left.right_extent
@@ -195,8 +189,6 @@ class AbstractParser(abc.ABC):
                 split=split
             )
             node.children[key] = packed_node
-        if self.debug:
-            self.on_node_p(slot, left, right, node)
         return node
 
     ###################################################################
@@ -247,7 +239,7 @@ class AbstractParser(abc.ABC):
             self.log('Skipping descriptor insertion (already seen)')
 
     def on_pop(self):
-        self.log(f'Popping from stack ({self.c_u})')
+        self.log(f'Popping from stack ({self.current_state.slot})')
 
     def on_create(self, slot: GrammarSlot):
         self.log(f'Creating GSS node for grammar slot: {slot}')

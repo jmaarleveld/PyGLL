@@ -63,52 +63,24 @@ class InitialNode(Node):
 @dataclasses.dataclass(frozen=True, slots=True)
 class IntermediateNode(Node):
     slot: GrammarSlot
-    is_nonterminal_node: bool = False
     children: dict[PackedNodeKey, PackedNode] = dataclasses.field(compare=False,
                                                                   default_factory=dict)
 
     @property
     def key(self) -> IntermediateNodeKey:
         return IntermediateNodeKey(self.slot,
-                                   self.is_nonterminal_node,
                                    self.left_extent,
                                    self.right_extent)
 
 
-@dataclasses.dataclass(frozen=True, slots=True, eq=False)
+@dataclasses.dataclass(frozen=True, slots=True)
 class IntermediateNodeKey:
     slot: GrammarSlot
-    is_nonterminal_node: bool
     left_extent: int
     right_extent: int
 
     def __str__(self):
-        position = self.slot.nonterminal if self.is_nonterminal_node else str(self.slot)
-        return f'INodeKey[{position} | {self.left_extent}-{self.right_extent}]'
-
-    def __eq__(self, other):
-        if not isinstance(other, IntermediateNodeKey):
-            return False
-        if self.is_nonterminal_node != other.is_nonterminal_node:
-            return False
-        if self.is_nonterminal_node:
-            return (
-                    self.slot.nonterminal == other.slot.nonterminal and
-                    self.left_extent == other.left_extent and
-                    self.right_extent == other.right_extent
-            )
-        return (
-            self.slot == other.slot and
-            self.left_extent == other.left_extent and
-            self.right_extent == other.right_extent
-        )
-
-    def __hash__(self):
-        if self.is_nonterminal_node:
-            key = (self.slot.nonterminal, self.left_extent, self.right_extent)
-        else:
-            key = (self.slot, self.left_extent, self.right_extent)
-        return hash(key)
+        return f'INodeKey[{self.slot} | {self.left_extent}-{self.right_extent}]'
 
 
 ##############################################################################
@@ -117,7 +89,7 @@ class IntermediateNodeKey:
 ##############################################################################
 
 
-@dataclasses.dataclass(frozen=True, slots=True)
+@dataclasses.dataclass(frozen=True, slots=True, eq=False)
 class GrammarSlot:
     """A grammar slot represents a rule of the form
     A := alpha . beta
@@ -144,7 +116,37 @@ class GrammarSlot:
     alpha_is_special: bool
     beta_is_special: bool
 
+    @classmethod
+    def nonterminal(cls, nonterminal: str, alpha: bool, beta: bool):
+        return cls(
+            nonterminal=nonterminal,
+            alternate=-1,
+            position=-1,
+            alpha_is_special=alpha,
+            beta_is_special=beta
+        )
+
+    def __eq__(self, other):
+        if not isinstance(other, GrammarSlot):
+            return False
+        if (self.alternate < 0) != (other.alternate < 0):
+            return False
+        if self.alternate < 0:
+            return self.nonterminal == other.nonterminal
+        return (
+            self.nonterminal == other.nonterminal and
+            self.alternate == other.alternate and
+            self.position == other.position
+        )
+
+    def __hash__(self):
+        if self.alternate < 0:
+            return hash(self.nonterminal)
+        return hash((self.nonterminal, self.alternate, self.position))
+
     def __str__(self):
+        if self.alternate < 0:
+            return self.nonterminal
         return f'{self.nonterminal}.{self.alternate}@{self.position}'
 
 
@@ -166,5 +168,5 @@ class Descriptor:
 
     def __str__(self):
         return (
-            f'state[{self.slot!s} | {self.stack!s} | {self.position} | {self.node}]'
+            f'state[{self.slot!s} | {self.stack!s} | {self.position} | <node ...>]'
         )

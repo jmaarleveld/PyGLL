@@ -274,6 +274,8 @@ class PythonCodeGenerator(AbstractCodeGenerator):
                 self.writer.write_line(f'if not self.{function_name}():')
                 with self.writer.increased_indent():
                     self.writer.write_line('return  # Abort')
+            case _ast.Comment(text=text):
+                self.writer.write_line(f'# {text}')
             case _:
                 raise ValueError(statement)
 

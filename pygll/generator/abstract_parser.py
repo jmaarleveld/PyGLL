@@ -125,6 +125,14 @@ class ParserDefinition:
             self.add_grammar_slot(definition)
         return name
 
+    def get_and_declare_grammar_slot_nonterminal(self,
+                                                 nonterminal: str,
+                                                 grammar: _cfg.ContextFreeGrammar,
+                                                 *, is_initial=False):
+        return self.get_and_declare_grammar_slot(
+            nonterminal, -1, -1, grammar, is_initial=is_initial
+        )
+
     def get_and_declare_literal_check(self, literal: str) -> str:
         definition = LiteralCheckDefinition(literal)
         if definition.name not in self.input_checks:
@@ -261,8 +269,12 @@ class GrammarSlotDefinition:
                       alternate: int,
                       position: int,
                       *, is_initial=False):
+        if is_initial and alternate < 0:
+            return '_initial_grammar_slot'
         if is_initial:
             return f'_initial_grammar_slot_idx{position}'
+        if alternate < 0:
+            return f'_grammar_slot_{nonterminal}'
         return (f'_grammar_slot_'
                 f'{nonterminal}_'
                 f'alt{alternate}_'
@@ -352,6 +364,11 @@ class FunctionDefinition:
 @dataclasses.dataclass(frozen=True, slots=True)
 class StatementDefinition:
     pass
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class Comment(StatementDefinition):
+    text: str
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

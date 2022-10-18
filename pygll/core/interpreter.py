@@ -143,7 +143,20 @@ class _InterpretedParser(_base.AbstractParser):
                                                              negated,
                                                              self.scanner.peek)
             case _ast.RestrictionCheck(slot, literals, ranges):
-                raise NotImplementedError
+                string = self.scanner.get_slice(start, stop)
+                print(start, stop, string)
+                if ranges and len(string) == 1:
+                    c = ord(string)
+                    for start, stop in ranges:
+                        if start <= c <= stop:
+                            return False
+                if literals:
+                    literals_by_length = {}
+                    for literal in literals:
+                        literals_by_length.setdefault(len(literal), set()).add(literal)
+                    if string in literals_by_length.get(len(string), set()):
+                        return False
+                return True
             case _:
                 raise ValueError(
                     f'Unknown disambiguation check: {check.__class__.__name__}'

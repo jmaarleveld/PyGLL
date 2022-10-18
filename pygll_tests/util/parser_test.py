@@ -41,8 +41,9 @@ class ParserTestCase(unittest.TestCase):
                                parser: typing.Type[AbstractParser],
                                parser_input: str,
                                description: str = ''):
+        p = parser()
         try:
-            _ = parser(parser_input).result
+            p.parse(parser_input)
         except ParsingError:
             pass
         else:
@@ -56,8 +57,9 @@ class ParserTestCase(unittest.TestCase):
                                parser: typing.Type[AbstractParser],
                                parser_input: str,
                                description: str = ''):
+        p = parser()
         try:
-            _ = parser(parser_input).result
+            p.parse(parser_input)
         except ParsingError:
             self.make_report(parser,
                              parser_input,
@@ -83,7 +85,8 @@ class ParserTestCase(unittest.TestCase):
             file.write('='*80 + '\n')
             buffer = io.StringIO()
             with contextlib.redirect_stdout(buffer):
-                result = parser(parser_input, debug=True)
+                p = parser(debug=True)
+                result = p.parse(parser_input)
             file.write(f'Key: [{result.get_final_slot()}, True, 0, {len(parser_input)}]\n')
             file.write('\n')
             file.write('Created:\n')

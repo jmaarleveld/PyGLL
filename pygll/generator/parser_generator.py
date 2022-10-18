@@ -387,3 +387,40 @@ def _terminal_to_check(
             return definition.get_and_declare_literal_check(seq)
         case _cfg.Terminal(ranges=ranges, sequence=None):
             return definition.get_and_declare_range_check(ranges)
+
+
+def _generate_grammar_slot_comment(nonterminal: _cfg.Nonterminal,
+                                   alternate: int,
+                                   position: int,
+                                   grammar: _cfg.ContextFreeGrammar):
+    expansion = grammar.rules[nonterminal][alternate]
+    prefix = expansion[:position]
+    suffix = expansion[position:]
+    return _ast.Comment(
+        text=f'|{_format_expansion(prefix)}| . |{_format_expansion(suffix)}|'
+    )
+
+
+def _format_expansion(expansion: list[_cfg.Terminal | _cfg.Nonterminal]):
+    parts = []
+    for symbol in expansion:
+        match symbol:
+            case _cfg.Nonterminal(name):
+                parts.append(name)
+            case _cfg.Terminal(ranges=None, sequence=None):
+                parts.append('""')
+            case _cfg.Terminal(ranges=None, sequence=text):
+                parts.append(f'"{text}"')
+            case _cfg.Terminal(ranges=ranges, sequence=None):
+                parts.append(_format_ranges(ranges))
+    return ' '.join(parts)
+
+
+def _format_ranges(ranges: tuple[tuple[int, int], ...]) -> str:
+    parts = []
+    for start, stop in ranges:
+        if start == stop:
+            parts.append(chr(start))
+        else:
+            parts.append(f'{chr(start)}-{chr(stop)}')
+    return '[' + ''.join(parts) + ']'
