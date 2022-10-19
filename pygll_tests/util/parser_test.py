@@ -13,6 +13,7 @@ from pygll.generator import generate_parser
 from pygll.generator.parser_generator import generate_parser as _gen_abstract_parser
 from pygll.core.base import ParsingError, AbstractParser
 from pygll.core.interpreter import build_dynamic_parser
+from pygll.generator.code_generators import PythonCodeGenerator
 
 
 class ParserTestCase(unittest.TestCase):
@@ -87,14 +88,21 @@ class ParserTestCase(unittest.TestCase):
             with contextlib.redirect_stdout(buffer):
                 p = parser(debug=True)
                 result = p.parse(parser_input)
-            file.write(f'Key: [{result.get_final_slot()}, True, 0, {len(parser_input)}]\n')
+            file.write(f'Key: [{p.get_final_slot()}, True, 0, {len(parser_input)}]\n')
             file.write('\n')
             file.write('Created:\n')
-            for key in result.created:
+            for key in p.created:
                 file.write(repr(key) + '\n')
             file.write('='*80 + '\n')
             file.write('Parser Debug Output:\n\n')
             file.write(buffer.getvalue() + '\n')
             file.write('='*80 + '\n')
             pprint.pprint(self.__abstract_parser, stream=file)
+            file.write('=' * 80 + '\n')
+            buffer = io.StringIO()
+            with contextlib.redirect_stdout(buffer):
+                gen = PythonCodeGenerator(buffer)
+                gen.generate_code(self.__abstract_parser)
+                source = buffer.getvalue()
+            file.write(source + '\n')
             #file.write(source)

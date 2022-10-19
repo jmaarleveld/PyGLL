@@ -45,12 +45,13 @@ metaprogramming language.
   - [x] Implement follow/not follow checks 
     - [x] Implement follow/not follow for terminals 
     - [x] Implement follow/not follow for nonterminals
-  - [ ] Implement restriction checks
+  - [x] Implement restriction checks
   - [ ] Implement "inline choice"
   - [ ] Implement kleene star and related constructs
   - [ ] Implement parametrized nonterminals 
   - [ ] Complete this list
-- [ ] Refactor `IntermediateNode` and `IntermediateNodeKey` to no longer have the `is_nonterminal` field.
+  - [ ] Implement priorities 
+- [x] Refactor `IntermediateNode` and `IntermediateNodeKey` to no longer have the `is_nonterminal` field.
   This field should be moved to the `GrammarSlot` class.
 - [x] Clean up debugging code 
 - [ ] Implement automatic CST node generation with support for pattern matching

@@ -2,7 +2,6 @@
 ##############################################################################
 # Imports
 ##############################################################################
-import collections
 
 from .base import AbstractCodeGenerator
 
@@ -33,7 +32,7 @@ class PythonCodeGenerator(AbstractCodeGenerator):
             f'class {parser.metadata.name}(AbstractParser):'
         )
         with self.writer.increased_indent():
-            self._generate_grammar_slots(parser.grammar_slots)
+            self._generate_grammar_slots(parser.all_grammar_slots)
             self.writer.write_empty_line()
             self._generate_abstract_methods(parser)
             self.writer.write_empty_line()
@@ -78,7 +77,10 @@ class PythonCodeGenerator(AbstractCodeGenerator):
             self.writer.write_line('match slot:')
             for slot, target in goto.items():
                 with self.writer.increased_indent():
-                    self.writer.write_line(f'case self.{slot}:')
+                    if slot is not None:
+                        self.writer.write_line(f'case self.{slot}:')
+                    else:
+                        self.writer.write_line(f'case None:')
                     with self.writer.increased_indent():
                         self.writer.write_line('if self.debug:')
                         with self.writer.increased_indent():
@@ -90,15 +92,22 @@ class PythonCodeGenerator(AbstractCodeGenerator):
                     self.writer.write_line('self.unknown(slot)')
 
     def _generate_abstract_methods(self, parser: ParserDefinition):
-        self.writer.write_line('def get_initial_slot(self):')
-        with self.writer.increased_indent():
-            slot_name = parser.initial_grammar_slot_start
-            self.writer.write_line(f'return self.{slot_name}')
-        self.writer.write_empty_line()
         self.writer.write_line('def get_final_slot(self):')
         with self.writer.increased_indent():
-            slot_name = parser.initial_grammar_slot_end
+            slot_name = parser.final_grammar_slot.name
             self.writer.write_line(f'return self.{slot_name}')
+        self.writer.write_empty_line()
+        self.writer.write_line('def get_full_nonterminal_slot_for_slot(self, slot):')
+        with self.writer.increased_indent():
+            self.writer.write_line('match slot.nonterminal:')
+            with self.writer.increased_indent():
+                for name, slot in parser.full_nonterminal_slots.items():
+                    self.writer.write_line(f'case "{slot.nonterminal}":')
+                    with self.writer.increased_indent():
+                        self.writer.write_line(f'return self.{name}')
+                self.writer.write_line('case _:')
+                with self.writer.increased_indent():
+                    self.writer.write_line('raise ValueError(slot)')
 
     def _generate_terminal_check(self, check: _ast.LiteralCheckDefinition):
         self.writer.write_line(f'def {check.name}(self):')

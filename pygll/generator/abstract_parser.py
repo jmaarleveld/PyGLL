@@ -58,9 +58,7 @@ class ParserDefinition:
     metadata: ParserMetadata
 
     # Grammar Slots
-    _initial_grammar_slot: dict[str, str | None] = dataclasses.field(
-        init=False, default_factory=lambda: {'start': None, 'end': None}
-    )
+    starting_nonterminal: str
     grammar_slots: dict[str, GrammarSlotDefinition] = dataclasses.field(
         init=False, default_factory=dict
     )
@@ -81,57 +79,30 @@ class ParserDefinition:
     )
 
     # Goto Definition
-    goto: dict[str, str] = dataclasses.field(
+    goto: dict[str | None, str] = dataclasses.field(
         init=False, default_factory=dict
     )
 
     ###################################################################
     # get_and_declare functions
 
-    @property
-    def initial_grammar_slot_start(self) -> str | None:
-        return self._initial_grammar_slot['start']
-
-    @initial_grammar_slot_start.setter
-    def initial_grammar_slot_start(self, slot: str):
-        self._initial_grammar_slot['start'] = slot
-
-    @property
-    def initial_grammar_slot_end(self) -> str | None:
-        return self._initial_grammar_slot['end']
-
-    @initial_grammar_slot_end.setter
-    def initial_grammar_slot_end(self, slot: str):
-        self._initial_grammar_slot['end'] = slot
-
     def get_and_declare_grammar_slot(self,
                                      nonterminal: str,
                                      alternate: int,
                                      position: int,
-                                     grammar: _cfg.ContextFreeGrammar,
-                                     *, is_initial=False):
+                                     grammar: _cfg.ContextFreeGrammar):
         name = GrammarSlotDefinition.get_slot_name(nonterminal,
                                                    alternate,
-                                                   position,
-                                                   is_initial=is_initial)
+                                                   position)
         if name not in self.grammar_slots:
             definition = GrammarSlotDefinition.from_key_and_grammar(
                 nonterminal,
                 alternate,
                 position,
                 grammar,
-                is_initial=is_initial
             )
             self.add_grammar_slot(definition)
         return name
-
-    def get_and_declare_grammar_slot_nonterminal(self,
-                                                 nonterminal: str,
-                                                 grammar: _cfg.ContextFreeGrammar,
-                                                 *, is_initial=False):
-        return self.get_and_declare_grammar_slot(
-            nonterminal, -1, -1, grammar, is_initial=is_initial
-        )
 
     def get_and_declare_literal_check(self, literal: str) -> str:
         definition = LiteralCheckDefinition(literal)
@@ -206,11 +177,41 @@ class ParserDefinition:
     def add_function(self, function: FunctionDefinition):
         self.parse_functions[function.name] = function
 
-    def add_goto_entry(self, key: str, target: str):
+    def add_goto_entry(self, key: str | None, target: str):
         self.goto[key] = target
 
     def add_ambiguity_check(self, check: AmbiguityCheckDefinition):
         self.ambiguity_checks[check.name] = check
+
+    ###################################################################
+    # Computed functions
+
+    @property
+    def nonterminals(self) -> set[str]:
+        return {
+            slot.nonterminal
+            for slot in self.grammar_slots.values()
+        }
+
+    @property
+    def full_nonterminal_slots(self) -> dict[str, GrammarSlotDefinition]:
+        return {
+                   slot.name: slot
+                   for slot in (GrammarSlotDefinition(nonterminal, -1, -1, False, True)
+                                for nonterminal in self.nonterminals)
+               }
+
+    @property
+    def final_grammar_slot(self) -> GrammarSlotDefinition:
+        return GrammarSlotDefinition(
+            self.starting_nonterminal, -1, -1, False, True
+        )
+
+    @property
+    def all_grammar_slots(self) -> dict[str, GrammarSlotDefinition]:
+        slots = self.grammar_slots | self.full_nonterminal_slots
+        assert self.final_grammar_slot.name in slots
+        return slots
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -231,15 +232,13 @@ class GrammarSlotDefinition:
     position: int
     alpha: bool
     beta: bool
-    is_initial: bool = False    # needed for naming
 
     @classmethod
     def from_key_and_grammar(cls,
                              nonterminal_name: str,
                              alternate_index: int,
                              position: int,
-                             grammar: _cfg.ContextFreeGrammar,
-                             *, is_initial=False) -> typing.Self:
+                             grammar: _cfg.ContextFreeGrammar) -> typing.Self:
         nonterminal = _cfg.Nonterminal(nonterminal_name)
         alternate = grammar.rules[nonterminal][alternate_index]
         if position != 1:
@@ -250,29 +249,22 @@ class GrammarSlotDefinition:
         beta = position == len(alternate)
         return cls(
             nonterminal=nonterminal_name,
-            alternate=alternate_index if not is_initial else -1,
+            alternate=alternate_index,
             position=position,
             alpha=alpha,
             beta=beta,
-            is_initial=is_initial
         )
 
     @property
     def name(self) -> str:
         return self.get_slot_name(self.nonterminal,
                                   self.alternate,
-                                  self.position,
-                                  is_initial=self.is_initial)
+                                  self.position)
 
     @staticmethod
     def get_slot_name(nonterminal: str,
                       alternate: int,
-                      position: int,
-                      *, is_initial=False):
-        if is_initial and alternate < 0:
-            return '_initial_grammar_slot'
-        if is_initial:
-            return f'_initial_grammar_slot_idx{position}'
+                      position: int):
         if alternate < 0:
             return f'_grammar_slot_{nonterminal}'
         return (f'_grammar_slot_'

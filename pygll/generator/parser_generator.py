@@ -31,7 +31,8 @@ def generate_parser(
         grammar: _cfg.ContextFreeGrammar,
         tags: dict[GrammarPosition, list[Tag]]) -> _ast.ParserDefinition:
     parser_definition = _ast.ParserDefinition(
-        _ast.ParserMetadata(parser_name)
+        _ast.ParserMetadata(parser_name),
+        starting_nonterminal=grammar.start.name
     )
     _generate_start_nonterminal_functions(parser_definition, grammar)
     _generate_functions_for_rules(parser_definition, grammar, tags)
@@ -40,17 +41,8 @@ def generate_parser(
 
 def _generate_start_nonterminal_functions(definition: _ast.ParserDefinition,
                                           grammar: _cfg.ContextFreeGrammar):
-    # define the initial grammar slot.
-    initial_slot_start = definition.get_and_declare_grammar_slot(
-        grammar.start.name, 0, 0, grammar, is_initial=True
-    )
-    definition.initial_grammar_slot_start = initial_slot_start
-    initial_slot_end = definition.get_and_declare_grammar_slot(
-        grammar.start.name, 0, 1, grammar, is_initial=True
-    )
-    definition.initial_grammar_slot_end = initial_slot_end
-    definition.add_goto_entry(initial_slot_start,
-                              f'nonterminal_check_{grammar.start.name}')
+    # define goto for "initial"/empty grammar slot
+    definition.add_goto_entry(None, f'nonterminal_check_{grammar.start.name}')
 
 
 def _generate_functions_for_rules(definition: _ast.ParserDefinition,
@@ -130,7 +122,12 @@ def _generate_gll_block_function(definition: _ast.ParserDefinition,
                                  grammar: _cfg.ContextFreeGrammar,
                                  tags: dict[GrammarPosition, list[Tag]]
                                  ) -> list[_ast.StatementDefinition]:
-    body = []
+    body = [
+        _generate_grammar_slot_comment(nonterminal,
+                                       alternate_number,
+                                       absolute_position,
+                                       grammar)
+    ]
     if gll_block:
         # body.extend(
         #     _generate_precede_checks(definition,
@@ -276,6 +273,11 @@ def _generate_gll_block_function_for_nonterminal(
     inner_body.append(
         _ast.CallFunction(f'nonterminal_check_{gll_block[0].name}')
     )
+    inner_body.append(
+        _ast.Comment(f'Parsing is resumed via a descriptor '
+                     f'`add()`ed by `pop()` when {gll_block[0].name} '
+                     f'has been successfully parsed.')
+    )
     # Return result
     return body, inner_body
 
@@ -295,6 +297,11 @@ def _generate_ambiguity_checks(definition: _ast.ParserDefinition,
     key = (nonterminal, alternate_number, absolute_position)
     tags_at_pos = tags.get(key, [])
     slot_name = _ast.GrammarSlotDefinition.get_slot_name(
+        nonterminal.name, alternate_number, absolute_position
+    )
+    # Checks executed in the pop() function must be offset
+    # by one, because of how grammar slots are generated.
+    slot_name_pop = _ast.GrammarSlotDefinition.get_slot_name(
         nonterminal.name, alternate_number, absolute_position + 1
     )
     ambiguity_checks = []
@@ -305,12 +312,20 @@ def _generate_ambiguity_checks(definition: _ast.ParserDefinition,
                 check = definition.get_and_declare_precede(slot=slot_name,
                                                            literals=literals,
                                                            ranges=list(ranges))
+                ambiguity_checks.extend(_generate_ambiguity_check_comment(
+                    nonterminal, alternate_number, absolute_position,
+                    'precede', terminals, grammar)
+                )
                 ambiguity_checks.append(_ast.Disambiguate(check))
             case ('not_precede', terminals):
                 literals, ranges = _split_terminals(terminals)
                 check = definition.get_and_declare_not_precede(slot=slot_name,
                                                                literals=literals,
                                                                ranges=list(ranges))
+                ambiguity_checks.extend(_generate_ambiguity_check_comment(
+                    nonterminal, alternate_number, absolute_position,
+                    'not_precede', terminals, grammar)
+                )
                 ambiguity_checks.append(_ast.Disambiguate(check))
             case ('follow', terminals):
                 literals, ranges = _split_terminals(terminals)
@@ -320,23 +335,48 @@ def _generate_ambiguity_checks(definition: _ast.ParserDefinition,
                                                           literals=literals,
                                                           ranges=list(ranges),
                                                           in_pop=check_in_pop)
+                ambiguity_checks.extend(_generate_ambiguity_check_comment(
+                    nonterminal, alternate_number, absolute_position,
+                    'follow', terminals, grammar)
+                )
                 if not check_in_pop:
                     ambiguity_checks.append(_ast.Disambiguate(check))
+                else:
+                    ambiguity_checks.append(
+                        _ast.Comment('(ambiguity check executed in pop())')
+                    )
             case ('not_follow', terminals):
                 literals, ranges = _split_terminals(terminals)
                 symbol_at_pos = grammar.rules[nonterminal][alternate_number][absolute_position]
                 check_in_pop = not grammar.is_terminal(symbol_at_pos)
-                check = definition.get_and_declare_not_follow(slot=slot_name,
+                check = definition.get_and_declare_not_follow(slot=(slot_name
+                                                                    if not check_in_pop
+                                                                    else slot_name_pop),
                                                               literals=literals,
                                                               ranges=list(ranges),
                                                               in_pop=check_in_pop)
+                ambiguity_checks.extend(_generate_ambiguity_check_comment(
+                    nonterminal, alternate_number, absolute_position,
+                    'not_follow', terminals, grammar)
+                )
                 if not check_in_pop:
                     ambiguity_checks.append(_ast.Disambiguate(check))
+                else:
+                    ambiguity_checks.append(
+                        _ast.Comment('(ambiguity check executed in pop())')
+                    )
             case ('restriction', terminals):
                 literals, ranges = _split_terminals(terminals)
-                definition.get_and_declare_restriction(slot=slot_name,
+                definition.get_and_declare_restriction(slot=slot_name_pop,
                                                        literals=literals,
                                                        ranges=list(ranges))
+                ambiguity_checks.extend(_generate_ambiguity_check_comment(
+                    nonterminal, alternate_number, absolute_position,
+                    'not_follow', terminals, grammar)
+                )
+                ambiguity_checks.append(
+                    _ast.Comment('(ambiguity check executed in pop())')
+                )
             case _:
                 raise ValueError(f'Cannot handle tag: {tag}')
     return ambiguity_checks
@@ -389,6 +429,12 @@ def _terminal_to_check(
             return definition.get_and_declare_range_check(ranges)
 
 
+##############################################################################
+##############################################################################
+# Grammar Slot Comments
+##############################################################################
+
+
 def _generate_grammar_slot_comment(nonterminal: _cfg.Nonterminal,
                                    alternate: int,
                                    position: int,
@@ -424,3 +470,38 @@ def _format_ranges(ranges: tuple[tuple[int, int], ...]) -> str:
         else:
             parts.append(f'{chr(start)}-{chr(stop)}')
     return '[' + ''.join(parts) + ']'
+
+
+##############################################################################
+##############################################################################
+# Ambiguity Comments
+##############################################################################
+
+
+def _generate_ambiguity_check_comment(nonterminal: _cfg.Nonterminal,
+                                      alternate: int,
+                                      position: int,
+                                      check_type: str,
+                                      checks: list[_cfg.Terminal],
+                                      grammar: _cfg.ContextFreeGrammar):
+    grammar_slot_start = _format_expansion(
+        grammar.rules[nonterminal][alternate][:position]
+    )
+    grammar_slot_end = _format_expansion(
+        grammar.rules[nonterminal][alternate][position:]
+    )
+    grammar_slot = f'|{grammar_slot_start}| . |{grammar_slot_end}|'
+    alignment = len(grammar_slot_start) + len('|') + len('| . |')
+    if isinstance(grammar.rules[nonterminal][alternate][position], _cfg.Terminal):
+        alignment += 1  # Adjust for the quote
+    return [
+        _ast.Comment('Ambiguity check:'),
+        _ast.Comment(grammar_slot),
+        _ast.Comment(' '*alignment + '^'),
+        _ast.Comment(' '*alignment + f'{check_type}:'),
+    ] + [
+        _ast.Comment(
+            ' ' * (alignment + 4) + '- ' + _format_expansion([terminal])
+        )
+        for terminal in checks
+    ]

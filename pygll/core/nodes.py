@@ -117,7 +117,7 @@ class GrammarSlot:
     beta_is_special: bool
 
     @classmethod
-    def nonterminal(cls, nonterminal: str, alpha: bool, beta: bool):
+    def full_nonterminal(cls, nonterminal: str, alpha: bool, beta: bool):
         return cls(
             nonterminal=nonterminal,
             alternate=-1,
@@ -161,7 +161,7 @@ class GSSNodeReference:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Descriptor:
-    slot: GrammarSlot
+    slot: GrammarSlot | None    # None for initial slot
     stack: GSSNodeReference
     position: int
     node: Node

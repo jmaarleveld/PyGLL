@@ -7,14 +7,14 @@ from ..generator import abstract_parser as _ast
 
 
 class DynamicParser(typing.Protocol):
-    def __call__(self, text: str, **kwargs) -> _base.AbstractParser:
+    def __call__(self, **kwargs) -> _base.AbstractParser:
         pass
 
 
 def build_dynamic_parser(
         parser: _ast.ParserDefinition) -> DynamicParser:
-    def dynamic_parser(text, **kwargs) -> _base.AbstractParser:
-        return _InterpretedParser(parser, text, **kwargs)
+    def dynamic_parser(**kwargs) -> _base.AbstractParser:
+        return _InterpretedParser(parser, **kwargs)
     return dynamic_parser
 
 
@@ -22,7 +22,6 @@ class _InterpretedParser(_base.AbstractParser):
 
     def __init__(self,
                  definition: _ast.ParserDefinition,
-                 text: str,
                  **kwargs):
         self.__def = definition
         self.__checks_by_slot = {}
@@ -34,11 +33,14 @@ class _InterpretedParser(_base.AbstractParser):
                 lambda *args, _c=name: self.__emulate_pop_check(*args, _c)
             )
         # Invoke the parser
-        super().__init__(text, **kwargs)
+        super().__init__(**kwargs)
 
-    def goto(self, slot: GrammarSlot):
-        name = self.__slot_to_name(slot)
-        function_name = self.__def.goto[name]
+    def goto(self, slot: GrammarSlot | None):
+        if slot is None:
+            function_name = self.__def.goto[None]
+        else:
+            name = self.__slot_to_name(slot)
+            function_name = self.__def.goto[name]
         self.goto_name(function_name)
 
     def goto_name(self, name: str):
@@ -93,6 +95,8 @@ class _InterpretedParser(_base.AbstractParser):
                     self.goto_name(function_name)
                 case _ast.InvokePop():
                     self.pop()
+                case _ast.Comment(_):
+                    pass    # Ignore comments
                 case _:
                     raise NotImplementedError(
                         f'Unknown parser instruction: {instruction.__class__.__name__}'
@@ -144,7 +148,6 @@ class _InterpretedParser(_base.AbstractParser):
                                                              self.scanner.peek)
             case _ast.RestrictionCheck(slot, literals, ranges):
                 string = self.scanner.get_slice(start, stop)
-                print(start, stop, string)
                 if ranges and len(string) == 1:
                     c = ord(string)
                     for start, stop in ranges:
@@ -182,15 +185,12 @@ class _InterpretedParser(_base.AbstractParser):
     def get_ambiguity_checks_for_slot(self, slot: GrammarSlot):
         return self.__checks_by_slot.get(slot, [])
 
-    def get_initial_slot(self) -> GrammarSlot:
-        key = self.__def.initial_grammar_slot_start
-        definition = self.__def.grammar_slots[key]
-        return self.__definition_to_slot(definition)
-
     def get_final_slot(self) -> GrammarSlot:
-        key = self.__def.initial_grammar_slot_end
-        definition = self.__def.grammar_slots[key]
-        return self.__definition_to_slot(definition)
+        return GrammarSlot(self.__def.starting_nonterminal, -1, -1, False, True)
+
+    def get_full_nonterminal_slot_for_slot(
+            self, slot: GrammarSlot) -> GrammarSlot:
+        return GrammarSlot(slot.nonterminal, -1, -1, False, True)
 
     @staticmethod
     def __definition_to_slot(definition: _ast.GrammarSlotDefinition):
@@ -208,5 +208,4 @@ class _InterpretedParser(_base.AbstractParser):
             slot.nonterminal,
             slot.alternate,
             slot.position,
-            is_initial=slot.alternate < 0
         )

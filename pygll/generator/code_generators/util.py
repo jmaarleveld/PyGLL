@@ -17,7 +17,7 @@ class CodeWriter:
         self.close()
 
     def close(self):
-        self.__file.close()
+        pass
 
     @property
     def closed(self):

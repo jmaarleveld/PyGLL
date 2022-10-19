@@ -78,12 +78,13 @@ class AbstractParser(abc.ABC):
         self.c_r: Node | None = None
 
         # Add initial descriptor
-        slot = self.get_initial_slot()
-        self.add(slot, self.root, 0, InitialNode(0, 0))
+        self.add(None, self.root, 0, InitialNode(0, 0))
 
         # Main parsing loop
         while self.todo:
             descriptor: Descriptor = self.todo.popleft()
+            self.log('=' * 80)
+            self.log(f'Switching parser state to: {descriptor}')
             self.current_state = descriptor
             self.c_n = descriptor.node
             self.c_u = descriptor.stack
@@ -95,15 +96,14 @@ class AbstractParser(abc.ABC):
         # intermediate node keys do not compare alternate
         # number and position when nonterminal == True.
         slot = self.get_final_slot()
-        key = IntermediateNodeKey(slot, True, 0, len(text))
+        key = IntermediateNodeKey(slot, 0, len(text))
         result = self.created.get(key, None)
+        if result is None:
+            raise ParsingError('Failed to parse')
         return result
 
-    _initial_grammar_slot_idx0 = None
-    _initial_grammar_slot_idx1 = None
-
     def add(self,
-            g: GrammarSlot,
+            g: GrammarSlot | None,
             stack: GSSNodeReference,
             position: int,
             s: Node):
@@ -136,14 +136,22 @@ class AbstractParser(abc.ABC):
             self.popped[self.c_u].append(self.c_n)
             to: GSSNodeReference
             label: Node
+            # pop() is called after a nonterminal has been successfully
+            # parsed. Using the loop below, we add() all descriptors
+            # which depended on the successful parsing of the
+            # nonterminal we just parsed.
+            # For all these nonterminals, we also have to perform
+            # the appropriate ambiguity checks.
+            # Follow or restriction checks must be executed
+            # after the nonterminal has been parsed, which is now.
             for to, label in self.gss.get_edges(self.c_u):
                 # Check for ambiguity
+                self.log(f'Popped node {to}')
                 for check in self.get_ambiguity_checks_for_slot(self.c_u.slot):
                     # Check is called with the span of the parsed nonterminal
-                    if not check(to.position, self.scanner.position):
+                    if not check(to.position + 1, self.scanner.position):
                         break
                 else:   # Only execute if all checks succeeded
-                    # Add descriptor
                     node = self.get_node_p(self.c_u.slot, label, self.c_n)
                     self.add(self.c_u.slot, to, self.scanner.position, node)
 
@@ -168,10 +176,22 @@ class AbstractParser(abc.ABC):
         left_extent = (left.left_extent
                        if not isinstance(left, InitialNode)
                        else right.left_extent)
+        # if beta is special, we are at the end of a nonterminal.
+        # That means that the Intermediate node we are
+        # about to create serves the purpose of a
+        # nonterminal node in a normal parse tree.
+        # Because of this, we fetch a grammar slot
+        # representing the fully parsed nonterminal.
+        # Note that the packed node does use
+        # the "raw" grammar slot.
+        intermediate_node_slot = (
+            slot if not slot.beta_is_special
+            else self.get_full_nonterminal_slot_for_slot(slot)
+        )
         intermediate_node = IntermediateNode(
             left_extent=left_extent,
             right_extent=right.right_extent,
-            slot=slot
+            slot=intermediate_node_slot
         )
         node = self.created.setdefault(intermediate_node.key,
                                        intermediate_node)
@@ -195,15 +215,11 @@ class AbstractParser(abc.ABC):
     # Abstract methods
 
     @abc.abstractmethod
-    def goto(self, slot: GrammarSlot):
+    def goto(self, slot: GrammarSlot | None):
         pass
 
     def unknown(self, slot: GrammarSlot):
         raise ValueError(f'No function found for grammar slot {slot}')
-
-    @abc.abstractmethod
-    def get_initial_slot(self) -> GrammarSlot:
-        pass
 
     @abc.abstractmethod
     def get_final_slot(self) -> GrammarSlot:
@@ -211,6 +227,11 @@ class AbstractParser(abc.ABC):
 
     @abc.abstractmethod
     def get_ambiguity_checks_for_slot(self, slot: GrammarSlot):
+        pass
+
+    @abc.abstractmethod
+    def get_full_nonterminal_slot_for_slot(
+            self, slot: GrammarSlot) -> GrammarSlot:
         pass
 
     ###################################################################
