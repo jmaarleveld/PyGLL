@@ -294,9 +294,9 @@ class CheckDefinition:
     @staticmethod
     def format_ranges(ranges: tuple[tuple[int, int], ...]) -> str:
         return '__'.join(
-            (f'{chr(start)}_{chr(stop)}'
+            (f'{start}_{stop}'
              if start != stop
-             else chr(start))
+             else str(start))
             for start, stop in ranges
         )
 
@@ -316,7 +316,8 @@ class LiteralCheckDefinition(InputCheckDefinition):
     def name(self) -> str:
         if not self.text:
             return 'terminal_test_empty'
-        return f'terminal_test_literal__{self.text}'
+        text_as_numbers = '_'.join(str(ord(x)) for x in self.text)
+        return f'terminal_test_literal__{text_as_numbers}'
 
     def get_check_type(self) -> CheckType:
         return CheckType.Literal

@@ -122,7 +122,7 @@ class PythonCodeGenerator(AbstractCodeGenerator):
     def _generate_range_check(self, check: _ast.RangeCheckDefinition):
         self.writer.write_line(f'def {check.name}(self):')
         with self.writer.increased_indent():
-            self.writer.write_line('char = ord(self.scanner.peek())')
+            self.writer.write_line('char = ord(self.scanner.peek(1))')
             condition = self._get_range_check('char', check.ranges)
             self.writer.write_line(f'return {condition}')
 
@@ -265,7 +265,7 @@ class PythonCodeGenerator(AbstractCodeGenerator):
                     )
                 else:
                     self.writer.write_line(
-                        f'{target} = self.get_node_t(self.scanner.peek())'
+                        f'{target} = self.get_node_t(self.scanner.peek(1))'
                     )
                     self.writer.write_line('self.scanner.advance(1)')
             case _ast.InvokeNodeP(grammar_slot=slot):
